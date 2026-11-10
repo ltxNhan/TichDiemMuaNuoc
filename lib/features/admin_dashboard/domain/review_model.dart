@@ -28,20 +28,31 @@ class ReviewModel {
   });
 
   ReviewModel copyWith({
+    String? id,
+    String? orderCode,
+    String? userName,
+    String? userAvatar,
+    int? qualityStars,
+    String? qualityLabel,
+    String? qualityEmoji,
+    List<String>? quickTags,
+    String? comment,
+    bool? hasPhoto,
+    DateTime? createdAt,
     String? adminResponse,
   }) {
     return ReviewModel(
-      id: id,
-      orderCode: orderCode,
-      userName: userName,
-      userAvatar: userAvatar,
-      qualityStars: qualityStars,
-      qualityLabel: qualityLabel,
-      qualityEmoji: qualityEmoji,
-      quickTags: quickTags,
-      comment: comment,
-      hasPhoto: hasPhoto,
-      createdAt: createdAt,
+      id: id ?? this.id,
+      orderCode: orderCode ?? this.orderCode,
+      userName: userName ?? this.userName,
+      userAvatar: userAvatar ?? this.userAvatar,
+      qualityStars: qualityStars ?? this.qualityStars,
+      qualityLabel: qualityLabel ?? this.qualityLabel,
+      qualityEmoji: qualityEmoji ?? this.qualityEmoji,
+      quickTags: quickTags ?? this.quickTags,
+      comment: comment ?? this.comment,
+      hasPhoto: hasPhoto ?? this.hasPhoto,
+      createdAt: createdAt ?? this.createdAt,
       adminResponse: adminResponse ?? this.adminResponse,
     );
   }

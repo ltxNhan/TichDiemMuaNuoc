@@ -5,6 +5,7 @@ import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/custom_toast.dart';
+import '../../auth/presentation/login_screen.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../menu/models/product_model.dart';
 import '../../menu/providers/menu_provider.dart';
@@ -137,6 +138,10 @@ class _StaffDashboardScreenState extends State<StaffDashboardScreen>
                 await auth.logout();
                 if (context.mounted) {
                   CustomToast.showSuccess(context, 'Đã đăng xuất tài khoản nhân viên');
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
                 }
               }
             },

@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import '../../../core/constants/app_endpoints.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/network/error_handler.dart';
+import '../../cart_checkout/repositories/supabase_order_service.dart';
 import '../models/order_model.dart';
+import '../../staff/models/staff_order_model.dart';
 
 class OrderPlacementResult {
   final OrderModel order;
@@ -19,8 +22,9 @@ class OrderPlacementResult {
 
 class OrderRepository {
   final DioClient _dioClient;
+  final SupabaseOrderService _supabaseService;
 
-  OrderRepository(this._dioClient);
+  OrderRepository(this._dioClient) : _supabaseService = SupabaseOrderService();
 
   Future<OrderPlacementResult> createOrder(Map<String, dynamic> payload) async {
     try {
@@ -35,6 +39,29 @@ class OrderRepository {
         VietQrModel? vietqr;
         if (data['vietqr'] != null) {
           vietqr = VietQrModel.fromJson(data['vietqr']);
+        }
+
+        // Write order to Supabase (realtime pipeline)
+        try {
+          final staffOrder = StaffOrder(
+            id: order.id,
+            orderCode: order.orderCode,
+            orderType: order.orderType,
+            customerName: order.recipientName,
+            customerPhone: order.recipientPhone,
+            deliveryAddress: order.deliveryAddress,
+            pickupTime: order.pickupTime,
+            items: [],
+            totalAmount: order.finalAmount,
+            paymentMethod: order.paymentMethod,
+            paymentStatus: order.paymentStatus,
+            orderStatus: order.orderStatus,
+            note: order.note,
+            createdAt: DateTime.parse(order.createdAt),
+          );
+          _supabaseService.writeOrder(staffOrder);
+        } catch (e) {
+          debugPrint('Supabase write failed (non-blocking): $e');
         }
 
         return OrderPlacementResult(
@@ -62,7 +89,7 @@ class OrderRepository {
         pickupTime: payload['pickup_time']?.toString(),
         deliveryAddress: payload['delivery_address']?.toString(),
         recipientPhone: payload['recipient_phone']?.toString() ?? '0901234567',
-        recipientName: payload['recipient_name']?.toString() ?? 'Nguyễn Văn An',
+        recipientName: payload['recipient_name']?.toString() ?? 'Khách đặt qua App',
         subtotalAmount: finalAmount,
         shippingFee: payload['order_type'] == 'delivery' ? 18000 : 0,
         discountAmount: (payload['points_used'] ?? 0) * 1000.0,

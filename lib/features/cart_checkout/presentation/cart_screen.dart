@@ -8,6 +8,8 @@ import '../../../core/utils/currency_formatter.dart';
 import '../../../core/utils/date_formatter.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/custom_toast.dart';
+import '../../../core/widgets/login_required_dialog.dart';
+import '../../auth/presentation/login_screen.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../providers/cart_provider.dart';
 import 'vietqr_payment_sheet.dart';
@@ -22,18 +24,29 @@ class CartScreen extends StatefulWidget {
 class _CartScreenState extends State<CartScreen> {
   final TextEditingController _voucherController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _recipientNameController = TextEditingController();
+  final TextEditingController _recipientPhoneController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     final cart = Provider.of<CartProvider>(context, listen: false);
+    final auth = Provider.of<AuthProvider>(context, listen: false);
     _addressController.text = cart.deliveryAddress;
+    _recipientNameController.text = cart.recipientName.isNotEmpty
+        ? cart.recipientName
+        : (auth.currentUser?.fullName ?? '');
+    _recipientPhoneController.text = cart.recipientPhone.isNotEmpty
+        ? cart.recipientPhone
+        : (auth.currentUser?.phone ?? '');
   }
 
   @override
   void dispose() {
     _voucherController.dispose();
     _addressController.dispose();
+    _recipientNameController.dispose();
+    _recipientPhoneController.dispose();
     super.dispose();
   }
 
@@ -311,6 +324,16 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   void _onCheckout(CartProvider cart, AuthProvider auth) async {
+    // KHÁCH VÃNG LAI KHÔNG THỂ MUA HÀNG -> YÊU CẦU ĐĂNG NHẬP
+    if (auth.isGuest) {
+      LoginRequiredDialog.show(
+        context,
+        title: 'HÃY ĐĂNG NHẬP ĐỂ MUA HÀNG',
+        message: 'Bạn đang ở chế độ Khách vãng lai nên chưa thể đặt hàng. Vui lòng đăng nhập tài khoản để thanh toán đơn hàng này nhé!',
+      );
+      return;
+    }
+
     if (cart.items.isEmpty) {
       CustomToast.showError(context, 'Giỏ hàng đang trống');
       return;
@@ -321,7 +344,29 @@ class _CartScreenState extends State<CartScreen> {
       return;
     }
 
+    // RÀNG BUỘC GIỜ HẸN LẤY MÓN (Tối thiểu 15 phút & trong khung giờ 07:00 - 22:30)
+    if (cart.orderType == 'pickup') {
+      final now = DateTime.now();
+      final diff = cart.pickupTime.difference(now).inMinutes;
+      if (diff < 14) {
+        CustomToast.showError(context, 'Vui lòng chọn giờ hẹn lấy sau ít nhất 15 phút để quầy kịp pha chế.');
+        return;
+      }
+      final totalMins = cart.pickupTime.hour * 60 + cart.pickupTime.minute;
+      if (totalMins < 7 * 60 || totalMins > 22 * 60 + 30) {
+        CustomToast.showError(context, 'Quán chỉ phục vụ hẹn lấy trong khung giờ mở cửa (07:00 - 22:30).');
+        return;
+      }
+    }
+
     cart.setDeliveryAddress(_addressController.text.trim());
+    final finalName = _recipientNameController.text.trim().isNotEmpty
+        ? _recipientNameController.text.trim()
+        : (auth.currentUser?.fullName ?? '');
+    final finalPhone = _recipientPhoneController.text.trim().isNotEmpty
+        ? _recipientPhoneController.text.trim()
+        : (auth.currentUser?.phone ?? '');
+    cart.setRecipient(finalName, finalPhone);
 
     final success = await cart.checkout(auth);
     if (!mounted) return;
@@ -344,6 +389,13 @@ class _CartScreenState extends State<CartScreen> {
     final loyalty = Provider.of<LoyaltyProvider>(context);
     final userPoints = auth.currentUser?.points ?? 0;
 
+    if (_recipientNameController.text.isEmpty && auth.currentUser?.fullName.isNotEmpty == true) {
+      _recipientNameController.text = auth.currentUser!.fullName;
+    }
+    if (_recipientPhoneController.text.isEmpty && auth.currentUser?.phone.isNotEmpty == true) {
+      _recipientPhoneController.text = auth.currentUser!.phone;
+    }
+
     return Scaffold(
       backgroundColor: AppColors.darkBackground,
       appBar: AppBar(
@@ -365,8 +417,15 @@ class _CartScreenState extends State<CartScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Thông báo Khách vãng lai cần đăng nhập
+                  if (auth.isGuest) _buildGuestNoticeBanner(context),
+
                   // 1. Order Type Toggle (Pickup vs Delivery)
                   _buildOrderTypeSelector(cart),
+                  const SizedBox(height: 16),
+
+                  // Thông tin khách nhận món
+                  _buildRecipientInfoSection(cart, auth),
                   const SizedBox(height: 16),
 
                   // 2. Pickup Time or Delivery Address Section
@@ -518,29 +577,125 @@ class _CartScreenState extends State<CartScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Icon(Icons.access_time_filled_rounded, color: AppColors.primaryGold, size: 20),
-              SizedBox(width: 8),
-              Text('Hẹn giờ đến lấy nước', style: AppTextStyles.titleMedium),
+              const Row(
+                children: [
+                  Icon(Icons.access_time_filled_rounded, color: AppColors.primaryGold, size: 20),
+                  SizedBox(width: 8),
+                  Text('Hẹn giờ đến lấy nước', style: AppTextStyles.titleMedium),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.brewGreen.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text(
+                  'Mở cửa: 07:00 - 22:30',
+                  style: TextStyle(color: AppColors.brewGreen, fontSize: 10.5, fontWeight: FontWeight.bold),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildTimeChip(cart, '15 phút nữa', 15),
+              _buildTimeChip(cart, '15 phút', 15),
               const SizedBox(width: 8),
-              _buildTimeChip(cart, '30 phút nữa', 30),
+              _buildTimeChip(cart, '30 phút', 30),
               const SizedBox(width: 8),
-              _buildTimeChip(cart, '45 phút nữa', 45),
+              _buildTimeChip(cart, '45 phút', 45),
+              const SizedBox(width: 8),
+              _buildCustomTimePickerChip(cart),
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            'Dự kiến pha xong lúc: ${DateFormatter.formatTime(cart.pickupTime)} hôm nay',
-            style: const TextStyle(fontSize: 12, color: AppColors.primaryGold, fontWeight: FontWeight.w500),
+          Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: AppColors.primaryGold, size: 14),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Dự kiến pha xong: ${DateFormatter.formatTime(cart.pickupTime)} hôm nay (tối thiểu sau 15 phút)',
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.primaryGold, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCustomTimePickerChip(CartProvider cart) {
+    return Expanded(
+      child: InkWell(
+        onTap: () async {
+          final now = DateTime.now();
+          final initialTime = TimeOfDay.fromDateTime(cart.pickupTime);
+          final picked = await showTimePicker(
+            context: context,
+            initialTime: initialTime,
+            builder: (ctx, child) {
+              return Theme(
+                data: ThemeData.dark().copyWith(
+                  colorScheme: const ColorScheme.dark(
+                    primary: AppColors.primaryGold,
+                    onPrimary: Colors.black,
+                    surface: AppColors.surfaceDark,
+                    onSurface: Colors.white,
+                  ),
+                ),
+                child: child!,
+              );
+            },
+          );
+
+          if (!mounted) return;
+
+          if (picked != null) {
+            final targetTime = DateTime(now.year, now.month, now.day, picked.hour, picked.minute);
+            final diff = targetTime.difference(now).inMinutes;
+
+            if (diff < 14) {
+              CustomToast.showError(context, 'Giờ hẹn lấy phải sau ít nhất 15 phút kể từ thời điểm này');
+              return;
+            }
+
+            final totalMins = picked.hour * 60 + picked.minute;
+            if (totalMins < 7 * 60 || totalMins > 22 * 60 + 30) {
+              CustomToast.showError(context, 'Quán chỉ mở cửa từ 07:00 đến 22:30');
+              return;
+            }
+
+            cart.setPickupTime(targetTime);
+            CustomToast.showSuccess(context, 'Đã đặt giờ lấy lúc: ${picked.format(context)}');
+          }
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceDark,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.divider),
+          ),
+          child: const Center(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.edit_calendar_rounded, size: 13, color: AppColors.primaryGold),
+                SizedBox(width: 4),
+                Text(
+                  'Chọn giờ',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -571,6 +726,127 @@ class _CartScreenState extends State<CartScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildRecipientInfoSection(CartProvider cart, AuthProvider auth) {
+    final user = auth.currentUser;
+    final isCustomized = _recipientNameController.text.trim().isNotEmpty &&
+        _recipientNameController.text.trim() != (user?.fullName ?? '');
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardDark,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isCustomized ? AppColors.primaryGold.withOpacity(0.5) : AppColors.divider,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.person_pin_circle_rounded, color: AppColors.primaryGold, size: 20),
+              const SizedBox(width: 8),
+              const Text('Thông tin khách nhận', style: AppTextStyles.titleMedium),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isCustomized
+                      ? AppColors.primaryGold.withOpacity(0.15)
+                      : AppColors.brewGreen.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isCustomized ? AppColors.primaryGold : AppColors.primaryGold.withOpacity(0.5),
+                    width: 0.8,
+                  ),
+                ),
+                child: Text(
+                  isCustomized ? 'Đặt hộ người khác' : 'Chính chủ tài khoản',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.bold,
+                    color: isCustomized ? AppColors.primaryGold : Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                flex: 6,
+                child: TextField(
+                  controller: _recipientNameController,
+                  style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                  onChanged: (val) {
+                    cart.setRecipient(val, _recipientPhoneController.text);
+                    setState(() {});
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Họ và tên khách nhận',
+                    labelStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    hintText: user?.fullName ?? 'Nhập họ và tên',
+                    hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+                    filled: true,
+                    fillColor: AppColors.surfaceDark,
+                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 18, color: AppColors.primaryGold),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                flex: 5,
+                child: TextField(
+                  controller: _recipientPhoneController,
+                  style: const TextStyle(color: Colors.white, fontSize: 13.5),
+                  keyboardType: TextInputType.phone,
+                  onChanged: (val) {
+                    cart.setRecipient(_recipientNameController.text, val);
+                    setState(() {});
+                  },
+                  decoration: InputDecoration(
+                    labelText: 'Số điện thoại',
+                    labelStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    hintText: user?.phone ?? '09xxxxxxxx',
+                    hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+                    filled: true,
+                    fillColor: AppColors.surfaceDark,
+                    prefixIcon: const Icon(Icons.phone_outlined, size: 18, color: AppColors.primaryGold),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Row(
+            children: [
+              Icon(Icons.info_outline_rounded, size: 13, color: AppColors.textMuted),
+              SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  'Tên này sẽ hiển thị trực tiếp trên màn hình Barista pha chế & tem dán ly nước.',
+                  style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1075,6 +1351,64 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  Widget _buildGuestNoticeBanner(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.primaryGold.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primaryGold.withOpacity(0.4)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primaryGold.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.lock_outline_rounded, color: AppColors.primaryGold, size: 20),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Chế độ Khách vãng lai',
+                  style: TextStyle(color: AppColors.primaryGold, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Vui lòng đăng nhập để hoàn tất đặt hàng & tích điểm!',
+                  style: TextStyle(color: Colors.white70, fontSize: 11.5),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen(initialTabIndex: 0)),
+              );
+            },
+            child: const Text('Đăng nhập', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBottomCheckoutBar(CartProvider cart, AuthProvider auth) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -1099,7 +1433,7 @@ class _CartScreenState extends State<CartScreen> {
             const SizedBox(width: 20),
             Expanded(
               child: CustomButton(
-                text: 'THANH TOÁN',
+                text: auth.isGuest ? 'ĐĂNG NHẬP ĐỂ MUA HÀNG' : 'THANH TOÁN',
                 isLoading: cart.isCheckingOut,
                 onPressed: () => _onCheckout(cart, auth),
               ),

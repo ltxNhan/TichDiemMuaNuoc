@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "dailycup (Chrome - HTML Renderer)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "-d",
+        "chrome",
+        "--web-renderer",
+        "html"
+      ]
+    },
+    {
+      "name": "dailycup (Chrome - Default)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "-d",
+        "chrome"
+      ]
+    },
+    {
+      "name": "dailycup (Windows Desktop)",
+      "request": "launch",
+      "type": "dart",
+      "args": [
+        "-d",
+        "windows"
+      ]
+    }
+  ]
+}
+

@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/currency_formatter.dart';
 import '../../../core/widgets/custom_toast.dart';
+import '../../auth/presentation/login_screen.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../menu/models/product_model.dart';
 import '../../menu/models/category_model.dart';
@@ -27,6 +28,104 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
 
   // Filter cho Tab Đánh giá
   int _selectedFilterStars = 0;
+
+  // Trạng thái ngày đang được chọn trên Biểu đồ Doanh thu (Mặc định: 6 - Hôm nay)
+  int _selectedRevenueDayIndex = 6;
+  int _revenueTimeFilter = 0; // 0: 7 ngày qua, 1: Tuần này, 2: Tháng này
+
+  final List<Map<String, dynamic>> _weeklyRevenueData = [
+    {
+      'day': 'T2',
+      'fullDay': 'Thứ Hai',
+      'date': '27/10',
+      'revenue': 3200000.0,
+      'amountText': '3.2M',
+      'ratio': 0.55,
+      'orderCount': 62,
+      'cupCount': 108,
+      'topProduct': 'Cà Phê Muối Biển (34 ly)',
+      'peakHours': '07:30 - 09:00 (Sáng)',
+      'isToday': false,
+    },
+    {
+      'day': 'T3',
+      'fullDay': 'Thứ Ba',
+      'date': '28/10',
+      'revenue': 3800000.0,
+      'amountText': '3.8M',
+      'ratio': 0.65,
+      'orderCount': 74,
+      'cupCount': 125,
+      'topProduct': 'Trà Sữa Hoàng Gia (41 ly)',
+      'peakHours': '11:45 - 13:15 (Trưa)',
+      'isToday': false,
+    },
+    {
+      'day': 'T4',
+      'fullDay': 'Thứ Tư',
+      'date': '29/10',
+      'revenue': 4100000.0,
+      'amountText': '4.1M',
+      'ratio': 0.72,
+      'orderCount': 80,
+      'cupCount': 136,
+      'topProduct': 'Trà Đào Cam Sả (45 ly)',
+      'peakHours': '14:00 - 15:30 (Chiều)',
+      'isToday': false,
+    },
+    {
+      'day': 'T5',
+      'fullDay': 'Thứ Năm',
+      'date': '30/10',
+      'revenue': 3900000.0,
+      'amountText': '3.9M',
+      'ratio': 0.68,
+      'orderCount': 76,
+      'cupCount': 130,
+      'topProduct': 'Cloudy Matcha Latte (38 ly)',
+      'peakHours': '12:00 - 13:30 (Trưa)',
+      'isToday': false,
+    },
+    {
+      'day': 'T6',
+      'fullDay': 'Thứ Sáu',
+      'date': '31/10',
+      'revenue': 4500000.0,
+      'amountText': '4.5M',
+      'ratio': 0.82,
+      'orderCount': 88,
+      'cupCount': 152,
+      'topProduct': 'Trà Sữa Hoàng Gia (54 ly)',
+      'peakHours': '15:00 - 17:30 (Chiều tối)',
+      'isToday': false,
+    },
+    {
+      'day': 'T7',
+      'fullDay': 'Thứ Bảy',
+      'date': '01/11',
+      'revenue': 5200000.0,
+      'amountText': '5.2M',
+      'ratio': 0.98,
+      'orderCount': 105,
+      'cupCount': 186,
+      'topProduct': 'Trà Sữa Hoàng Gia (62 ly)',
+      'peakHours': '19:00 - 21:30 (Tối)',
+      'isToday': false,
+    },
+    {
+      'day': 'CN',
+      'fullDay': 'Chủ Nhật (Hôm nay)',
+      'date': '02/11',
+      'revenue': 4850000.0,
+      'amountText': '4.85M',
+      'ratio': 0.90,
+      'orderCount': 96,
+      'cupCount': 164,
+      'topProduct': 'Cà Phê Muối Biển (58 ly)',
+      'peakHours': '08:30 - 11:00 & 19:30 - 21:30',
+      'isToday': true,
+    },
+  ];
 
   // Danh sách các đơn hàng hôm nay phục vụ báo cáo Doanh thu & Chi tiết hóa đơn
   final List<Map<String, dynamic>> _todayOrdersList = [
@@ -385,6 +484,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   // Filter cho Tab Menu
   int _selectedMenuCategory = 0; // 0: Tất cả
   final TextEditingController _menuSearchController = TextEditingController();
+
+  // Filter cho Tab Nhân sự (0: Tất cả, 1: Đang ca, 2: Nghỉ ca)
+  int _selectedStaffFilter = 0;
 
   // Danh sách nhân sự mẫu quản lý
   final List<Map<String, dynamic>> _staffList = [
@@ -1120,6 +1222,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
     String selectedRole = 'Barista & Pha chế';
+    String selectedShift = 'Ca Sáng (07:00 - 15:00)';
 
     showDialog(
       context: context,
@@ -1224,6 +1327,42 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     if (val != null) setModalState(() => selectedRole = val);
                   },
                 ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Ca làm việc ban đầu',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: selectedShift,
+                  dropdownColor: AppColors.surfaceDark,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppColors.cardDark,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'Ca Sáng (07:00 - 15:00)',
+                      child: Text('Ca Sáng (07:00 - 15:00)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Ca Chiều (14:00 - 22:00)',
+                      child: Text('Ca Chiều (14:00 - 22:00)'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'Ca Tối (18:00 - 23:00)',
+                      child: Text('Ca Tối (18:00 - 23:00)'),
+                    ),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setModalState(() => selectedShift = val);
+                  },
+                ),
               ],
             ),
           ),
@@ -1247,21 +1386,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 final name = nameCtrl.text.trim();
                 final phone = phoneCtrl.text.trim();
                 if (name.isNotEmpty && phone.isNotEmpty) {
+                  final nextNum = 8 + _staffList.length;
+                  final codeStr = 'BP-STF-${nextNum.toString().padLeft(3, '0')}';
                   setState(() {
                     _staffList.add({
                       'name': name,
-                      'code': 'BP-STF-0${_staffList.length + 8}',
+                      'code': codeStr,
                       'role': selectedRole,
                       'phone': phone,
                       'status': 'active',
-                      'shift': 'Ca Trực Mới',
-                      'performance': 'Mới kích hoạt tài khoản',
+                      'shift': selectedShift,
+                      'performance': 'Sẵn sàng nhận ca làm việc',
                     });
                   });
                   Navigator.pop(ctx);
                   CustomToast.showSuccess(
                     context,
-                    'Đã cấp tài khoản nhân viên cho $name!',
+                    'Đã cấp tài khoản nhân viên $codeStr cho $name!',
                   );
                 }
               },
@@ -1272,6 +1413,401 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // BottomSheet chi tiết & thao tác nhân sự tương tác
+  void _showStaffActionBottomSheet(Map<String, dynamic> staff, int index) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (bottomSheetContext, setSheetState) {
+          final isActive = staff['status'] == 'active';
+          final isBarista = staff['role'].toString().contains('Barista');
+          final isCashier = staff['role'].toString().contains('Thu ngân');
+
+          return Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+            decoration: const BoxDecoration(
+              color: AppColors.surfaceDark,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Drag handle
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+
+                // Header Profile Info
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 26,
+                      backgroundColor: AppColors.cardDark,
+                      child: Icon(
+                        isBarista
+                            ? Icons.coffee_rounded
+                            : isCashier
+                                ? Icons.point_of_sale_rounded
+                                : Icons.delivery_dining_rounded,
+                        color: AppColors.primaryGold,
+                        size: 26,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                staff['name'],
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.cardDark,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: AppColors.primaryGold.withOpacity(0.4)),
+                                ),
+                                child: Text(
+                                  staff['code'],
+                                  style: const TextStyle(
+                                    color: AppColors.primaryGold,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${staff['role']} • SĐT: ${staff['phone']}',
+                            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                const Divider(color: AppColors.divider, height: 1),
+                const SizedBox(height: 16),
+
+                // Trạng thái ca trực hiện tại
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardDark,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isActive
+                          ? AppColors.success.withOpacity(0.4)
+                          : AppColors.divider,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            isActive ? Icons.check_circle_rounded : Icons.pause_circle_rounded,
+                            color: isActive ? AppColors.success : AppColors.textMuted,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isActive ? 'Đang trong ca trực' : 'Đang nghỉ ca',
+                                style: TextStyle(
+                                  color: isActive ? AppColors.success : AppColors.textMuted,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${staff['shift']} • ${staff['performance']}',
+                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Switch(
+                        value: isActive,
+                        activeColor: AppColors.primaryGold,
+                        onChanged: (val) {
+                          setState(() {
+                            staff['status'] = val ? 'active' : 'off';
+                            if (val) {
+                              staff['performance'] = 'Đang nhận ca trực hoạt động';
+                            } else {
+                              staff['performance'] = 'Đã kết thúc ca làm việc';
+                            }
+                          });
+                          setSheetState(() {});
+                          CustomToast.showSuccess(
+                            context,
+                            val ? 'Nhân viên đã vào ca trực!' : 'Nhân viên đã kết thúc ca!',
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                // Nút Đổi ca làm việc
+                const Text(
+                  'Phân ca làm việc',
+                  style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    'Ca Sáng (07:00 - 15:00)',
+                    'Ca Chiều (14:00 - 22:00)',
+                    'Ca Tối (18:00 - 23:00)',
+                  ].map((shiftName) {
+                    final isShiftSelected = staff['shift'] == shiftName;
+                    return ChoiceChip(
+                      label: Text(shiftName),
+                      selected: isShiftSelected,
+                      selectedColor: AppColors.primaryGold,
+                      backgroundColor: AppColors.cardDark,
+                      labelStyle: TextStyle(
+                        color: isShiftSelected ? Colors.black : Colors.white70,
+                        fontSize: 11.5,
+                        fontWeight: isShiftSelected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            staff['shift'] = shiftName;
+                          });
+                          setSheetState(() {});
+                          CustomToast.showSuccess(context, 'Đã chuyển sang $shiftName');
+                        }
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+
+                // Các nút hành động chính
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                          side: const BorderSide(color: Colors.redAccent),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () {
+                          _confirmDeleteStaff(context, staff, index, ctx);
+                        },
+                        icon: const Icon(Icons.delete_outline_rounded, size: 16),
+                        label: const Text('Xóa nhân viên', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryGold,
+                          foregroundColor: Colors.black,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showEditStaffDialog(context, staff, index);
+                        },
+                        icon: const Icon(Icons.edit_rounded, size: 16),
+                        label: const Text('Sửa thông tin', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showEditStaffDialog(BuildContext context, Map<String, dynamic> staff, int index) {
+    final nameCtrl = TextEditingController(text: staff['name']);
+    final phoneCtrl = TextEditingController(text: staff['phone']);
+    String selectedRole = staff['role'];
+
+    if (!['Barista Trưởng & Pha chế', 'Barista & Pha chế', 'Thu ngân & Quét POS', 'Thu ngân / POS', 'Điều phối viên Giao hàng', 'Giao hàng / Dispatcher'].contains(selectedRole)) {
+      selectedRole = 'Barista & Pha chế';
+    }
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          backgroundColor: AppColors.surfaceDark,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            'Sửa thông tin: ${staff['name']}',
+            style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Họ và tên', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: nameCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppColors.cardDark,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Số điện thoại', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppColors.cardDark,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text('Vị trí phân quyền', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<String>(
+                  value: selectedRole.contains('Barista')
+                      ? 'Barista & Pha chế'
+                      : selectedRole.contains('Thu ngân')
+                          ? 'Thu ngân / POS'
+                          : 'Giao hàng / Dispatcher',
+                  dropdownColor: AppColors.surfaceDark,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppColors.cardDark,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Barista & Pha chế', child: Text('Barista & Pha chế (KDS)')),
+                    DropdownMenuItem(value: 'Thu ngân / POS', child: Text('Thu ngân & Quét POS tích điểm')),
+                    DropdownMenuItem(value: 'Giao hàng / Dispatcher', child: Text('Điều phối giao hàng')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setModalState(() => selectedRole = val);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Hủy', style: TextStyle(color: AppColors.textMuted)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () {
+                final name = nameCtrl.text.trim();
+                final phone = phoneCtrl.text.trim();
+                if (name.isNotEmpty && phone.isNotEmpty) {
+                  setState(() {
+                    staff['name'] = name;
+                    staff['phone'] = phone;
+                    staff['role'] = selectedRole;
+                  });
+                  Navigator.pop(ctx);
+                  CustomToast.showSuccess(context, 'Đã cập nhật thông tin nhân viên $name!');
+                }
+              },
+              child: const Text('Lưu thay đổi', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteStaff(BuildContext context, Map<String, dynamic> staff, int index, BuildContext bottomSheetContext) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Xác nhận xóa nhân viên', style: TextStyle(color: Colors.redAccent, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Text(
+          'Bạn có chắc chắn muốn xóa nhân viên "${staff['name']}" (${staff['code']}) khỏi hệ thống?\nHành động này không thể hoàn tác.',
+          style: const TextStyle(color: Colors.white70, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              setState(() {
+                _staffList.removeAt(index);
+              });
+              Navigator.pop(ctx); // Close dialog
+              Navigator.pop(bottomSheetContext); // Close bottom sheet
+              CustomToast.showSuccess(context, 'Đã xóa tài khoản nhân viên thành công!');
+            },
+            child: const Text('Xác nhận xóa', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -1360,6 +1896,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   CustomToast.showSuccess(
                     context,
                     'Đã đăng xuất tài khoản quản trị viên',
+                  );
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
                   );
                 }
               }
@@ -3322,55 +3862,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           ),
           const SizedBox(height: 20),
 
-          // Biểu đồ doanh thu 7 ngày qua
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceDark,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.divider),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Doanh thu 7 ngày gần nhất',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      'Mục tiêu: 35.000.000 ₫/tuần',
-                      style: TextStyle(
-                        color: AppColors.primaryGold,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    _buildRevenueBar('T2', 0.55, '3.2M'),
-                    _buildRevenueBar('T3', 0.65, '3.8M'),
-                    _buildRevenueBar('T4', 0.72, '4.1M'),
-                    _buildRevenueBar('T5', 0.68, '3.9M'),
-                    _buildRevenueBar('T6', 0.85, '4.5M'),
-                    _buildRevenueBar('T7', 0.98, '5.2M'),
-                    _buildRevenueBar('CN', 0.90, '4.85M', isToday: true),
-                  ],
-                ),
-              ],
-            ),
-          ),
+          // Biểu đồ doanh thu 7 ngày qua (Interactive Luxury Gold Chart)
+          _buildInteractiveRevenueChart(),
           const SizedBox(height: 20),
 
           // Cơ cấu nhóm món bán chạy
@@ -3555,43 +4048,476 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     );
   }
 
-  Widget _buildRevenueBar(
-    String label,
-    double ratio,
-    String amount, {
-    bool isToday = false,
-  }) {
-    return Column(
-      children: [
-        Text(
-          amount,
-          style: TextStyle(
-            color: isToday ? AppColors.primaryGold : AppColors.textMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
+  String _formatVND(double amount) {
+    final str = amount.toInt().toString();
+    final parts = str.replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+    return '$parts ₫';
+  }
+
+  Widget _buildInteractiveRevenueChart() {
+    final selectedDay = (_selectedRevenueDayIndex >= 0 &&
+            _selectedRevenueDayIndex < _weeklyRevenueData.length)
+        ? _weeklyRevenueData[_selectedRevenueDayIndex]
+        : _weeklyRevenueData.last;
+
+    final double totalWeekRevenue = _weeklyRevenueData.fold(
+      0.0,
+      (sum, item) => sum + (item['revenue'] as double? ?? 0.0),
+    );
+    const double weeklyTarget = 35000000.0;
+    final double targetPercent = (totalWeekRevenue / weeklyTarget).clamp(0.0, 1.0);
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceDark,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.divider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          width: 24,
-          height: 100 * ratio,
-          decoration: BoxDecoration(
-            color: isToday
-                ? AppColors.primaryGold
-                : AppColors.primaryGold.withOpacity(0.35),
-            borderRadius: BorderRadius.circular(6),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header: Tiêu đề & Bộ lọc thời gian
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Doanh thu 7 ngày gần nhất',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.touch_app_rounded,
+                          size: 13,
+                          color: AppColors.primaryGold.withOpacity(0.9),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Chạm từng cột để xem chi tiết',
+                          style: TextStyle(
+                            color: AppColors.primaryGold.withOpacity(0.85),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Time filter pills
+              Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: AppColors.cardDark,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.divider),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildRevenueFilterButton('7N', 0),
+                    _buildRevenueFilterButton('Tuần', 1),
+                    _buildRevenueFilterButton('Tháng', 2),
+                  ],
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 14),
+
+          // KPI Progress bar
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.cardDark.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Tiến độ mục tiêu tuần',
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                    Text(
+                      '${_formatVND(totalWeekRevenue)} / 35.000.000 ₫ (${(targetPercent * 100).toStringAsFixed(1)}%)',
+                      style: const TextStyle(
+                        color: AppColors.primaryGold,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: targetPercent,
+                    minHeight: 5,
+                    backgroundColor: Colors.white.withOpacity(0.08),
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Bar Chart
+          SizedBox(
+            height: 155,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(_weeklyRevenueData.length, (index) {
+                return _buildInteractiveRevenueBar(index, _weeklyRevenueData[index]);
+              }),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Divider(color: AppColors.divider, height: 1),
+          const SizedBox(height: 14),
+
+          // Drill-down Detail Card cho ngày được chọn
+          _buildSelectedDayDetailCard(selectedDay),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRevenueFilterButton(String label, int index) {
+    final isSelected = _revenueTimeFilter == index;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _revenueTimeFilter = index;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryGold : Colors.transparent,
+          borderRadius: BorderRadius.circular(7),
         ),
-        const SizedBox(height: 6),
-        Text(
+        child: Text(
           label,
           style: TextStyle(
-            color: isToday ? Colors.white : AppColors.textMuted,
+            color: isSelected ? Colors.black : AppColors.textMuted,
             fontSize: 11,
-            fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
           ),
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildInteractiveRevenueBar(int index, Map<String, dynamic> data) {
+    final bool isSelected = _selectedRevenueDayIndex == index;
+    final bool isToday = data['isToday'] as bool? ?? false;
+    final double ratio = (data['ratio'] as num?)?.toDouble() ?? 0.5;
+    final String amountText = data['amountText'] as String? ?? '';
+    final String dayLabel = data['day'] as String? ?? '';
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        setState(() {
+          _selectedRevenueDayIndex = index;
+        });
+      },
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // Amount text above bar
+          AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            style: TextStyle(
+              color: isSelected
+                  ? AppColors.primaryGold
+                  : (isToday ? AppColors.primaryGold.withOpacity(0.85) : AppColors.textMuted),
+              fontSize: isSelected ? 12 : 10,
+              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            ),
+            child: Text(amountText),
+          ),
+          const SizedBox(height: 8),
+
+          // The Bar
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+            width: isSelected ? 30 : 25,
+            height: (105 * ratio).clamp(24.0, 110.0),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              gradient: isSelected
+                  ? const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0xFFFFDF7D),
+                        AppColors.primaryGold,
+                        Color(0xFFC7922A),
+                      ],
+                    )
+                  : LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        AppColors.primaryGold.withOpacity(isToday ? 0.6 : 0.35),
+                        AppColors.primaryGold.withOpacity(isToday ? 0.35 : 0.18),
+                      ],
+                    ),
+              border: isSelected
+                  ? Border.all(color: const Color(0xFFFFF0A6), width: 1.2)
+                  : null,
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primaryGold.withOpacity(0.45),
+                        blurRadius: 12,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : null,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Day label below bar
+          AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
+            style: TextStyle(
+              color: isSelected ? Colors.white : AppColors.textMuted,
+              fontSize: isSelected ? 12 : 11,
+              fontWeight: (isSelected || isToday) ? FontWeight.bold : FontWeight.normal,
+            ),
+            child: Text(dayLabel),
+          ),
+          const SizedBox(height: 3),
+
+          // Active indicator dot
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 200),
+            opacity: isSelected ? 1.0 : 0.0,
+            child: Container(
+              width: 4,
+              height: 4,
+              decoration: const BoxDecoration(
+                color: AppColors.primaryGold,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSelectedDayDetailCard(Map<String, dynamic> data) {
+    final String fullDay = data['fullDay'] as String? ?? '';
+    final String date = data['date'] as String? ?? '';
+    final double revenue = (data['revenue'] as num?)?.toDouble() ?? 0.0;
+    final int orderCount = data['orderCount'] as int? ?? 0;
+    final int cupCount = data['cupCount'] as int? ?? 0;
+    final String topProduct = data['topProduct'] as String? ?? 'N/A';
+    final String peakHours = data['peakHours'] as String? ?? 'N/A';
+    final bool isToday = data['isToday'] as bool? ?? false;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.cardDark,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.primaryGold.withOpacity(0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header card: Ngày + Badge + Doanh thu
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '$fullDay ($date)',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (isToday) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryGold.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppColors.primaryGold.withOpacity(0.5),
+                        ),
+                      ),
+                      child: const Text(
+                        'Hôm nay',
+                        style: TextStyle(
+                          color: AppColors.primaryGold,
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              Text(
+                _formatVND(revenue),
+                style: const TextStyle(
+                  color: AppColors.primaryGold,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // 2x2 Grid metric chips
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricItem(
+                  icon: Icons.receipt_long_rounded,
+                  label: 'Đơn hàng',
+                  value: '$orderCount đơn',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMetricItem(
+                  icon: Icons.local_drink_rounded,
+                  label: 'Số ly phục vụ',
+                  value: '$cupCount ly',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetricItem(
+                  icon: Icons.access_time_filled_rounded,
+                  label: 'Giờ cao điểm',
+                  value: peakHours,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMetricItem(
+                  icon: Icons.star_rounded,
+                  label: 'Món bán chạy nhất',
+                  value: topProduct,
+                  highlight: true,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetricItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    bool highlight = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceDark.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: highlight
+              ? AppColors.primaryGold.withOpacity(0.3)
+              : AppColors.divider.withOpacity(0.4),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            icon,
+            size: 15,
+            color: highlight ? AppColors.primaryGold : AppColors.textMuted,
+          ),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 9.5,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: highlight ? AppColors.primaryGold : Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -5206,12 +6132,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   // TAB 4: QUẢN LÝ NHÂN SỰ & CA TRỰC (STAFF MANAGEMENT)
   // ==============================================================================
   Widget _buildStaffManagementTab() {
+    final activeCount = _staffList.where((s) => s['status'] == 'active').length;
+    final offCount = _staffList.length - activeCount;
+
+    final filteredList = _staffList.asMap().entries.where((entry) {
+      if (_selectedStaffFilter == 1) return entry.value['status'] == 'active';
+      if (_selectedStaffFilter == 2) return entry.value['status'] != 'active';
+      return true;
+    }).toList();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Thẻ hành động thêm nhân sự
+          // Thẻ tiêu đề & Nút thêm nhân sự
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -5222,10 +6157,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                     'Danh sách nhân viên',
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 15,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     '${_staffList.length} Nhân viên đang đăng ký hệ thống',
                     style: const TextStyle(
@@ -5240,8 +6176,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                   backgroundColor: AppColors.primaryGold,
                   foregroundColor: Colors.black,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                    horizontal: 14,
+                    vertical: 9,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -5258,124 +6194,278 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
           ),
           const SizedBox(height: 16),
 
-          // Danh sách nhân sự
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _staffList.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (ctx, i) {
-              final staff = _staffList[i];
-              final isActive = staff['status'] == 'active';
-
-              return Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceDark,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.divider),
+          // 1. Thẻ thống kê KPI ca trực nhanh
+          Row(
+            children: [
+              Expanded(
+                child: _buildStaffKpiCard(
+                  icon: Icons.groups_rounded,
+                  label: 'Tổng nhân sự',
+                  value: '${_staffList.length}',
+                  color: AppColors.primaryGold,
                 ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: AppColors.cardDark,
-                      child: Icon(
-                        staff['role'].toString().contains('Barista')
-                            ? Icons.coffee_rounded
-                            : Icons.badge_rounded,
-                        color: AppColors.primaryGold,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStaffKpiCard(
+                  icon: Icons.check_circle_rounded,
+                  label: 'Đang trong ca',
+                  value: '$activeCount',
+                  color: AppColors.success,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildStaffKpiCard(
+                  icon: Icons.pause_circle_rounded,
+                  label: 'Nghỉ ca',
+                  value: '$offCount',
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 2. Bộ lọc ca trực (Tất cả, Đang ca, Nghỉ ca)
+          Row(
+            children: [
+              _buildStaffFilterPill('Tất cả (${_staffList.length})', 0),
+              const SizedBox(width: 8),
+              _buildStaffFilterPill('Đang ca ($activeCount)', 1),
+              const SizedBox(width: 8),
+              _buildStaffFilterPill('Nghỉ ca ($offCount)', 2),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // 3. Danh sách nhân sự có tương tác chạm mở điều khiển
+          filteredList.isEmpty
+              ? Container(
+                  padding: const EdgeInsets.all(28),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceDark,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: const Column(
+                    children: [
+                      Icon(Icons.person_off_rounded, size: 36, color: AppColors.textMuted),
+                      SizedBox(height: 8),
+                      Text('Không có nhân sự nào trong danh sách', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: filteredList.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (ctx, idx) {
+                    final originalIndex = filteredList[idx].key;
+                    final staff = filteredList[idx].value;
+                    final isActive = staff['status'] == 'active';
+
+                    return Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () => _showStaffActionBottomSheet(staff, originalIndex),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceDark,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isActive
+                                  ? AppColors.primaryGold.withOpacity(0.3)
+                                  : AppColors.divider,
+                            ),
+                          ),
+                          child: Row(
                             children: [
-                              Text(
-                                staff['name'],
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.bold,
+                              CircleAvatar(
+                                radius: 22,
+                                backgroundColor: AppColors.cardDark,
+                                child: Icon(
+                                  staff['role'].toString().contains('Barista')
+                                      ? Icons.coffee_rounded
+                                      : staff['role'].toString().contains('Thu ngân')
+                                          ? Icons.point_of_sale_rounded
+                                          : Icons.delivery_dining_rounded,
+                                  color: AppColors.primaryGold,
+                                  size: 22,
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          staff['name'],
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.cardDark,
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: AppColors.primaryGold.withOpacity(0.3)),
+                                          ),
+                                          child: Text(
+                                            staff['code'],
+                                            style: const TextStyle(
+                                              color: AppColors.primaryGold,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${staff['role']} • SĐT: ${staff['phone']}',
+                                      style: const TextStyle(
+                                        color: AppColors.textMuted,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${staff['shift']} • ${staff['performance']}',
+                                      style: TextStyle(
+                                        color: isActive
+                                            ? AppColors.success
+                                            : AppColors.textMuted,
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.cardDark,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  staff['code'],
-                                  style: const TextStyle(
-                                    color: AppColors.primaryGold,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                children: [
+                                  Icon(
+                                    isActive
+                                        ? Icons.check_circle_rounded
+                                        : Icons.pause_circle_rounded,
+                                    color: isActive
+                                        ? AppColors.success
+                                        : AppColors.textMuted,
+                                    size: 18,
                                   ),
-                                ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isActive ? 'Đang ca' : 'Nghỉ ca',
+                                    style: TextStyle(
+                                      color: isActive
+                                          ? AppColors.success
+                                          : AppColors.textMuted,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(
+                                Icons.chevron_right_rounded,
+                                color: AppColors.textMuted,
+                                size: 18,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${staff['role']} • SĐT: ${staff['phone']}',
-                            style: const TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 11,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${staff['shift']} • ${staff['performance']}',
-                            style: TextStyle(
-                              color: isActive
-                                  ? AppColors.success
-                                  : AppColors.textMuted,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                    Column(
-                      children: [
-                        Icon(
-                          isActive
-                              ? Icons.check_circle_rounded
-                              : Icons.pause_circle_rounded,
-                          color: isActive
-                              ? AppColors.success
-                              : AppColors.textMuted,
-                          size: 18,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          isActive ? 'Đang ca' : 'Nghỉ ca',
-                          style: TextStyle(
-                            color: isActive
-                                ? AppColors.success
-                                : AppColors.textMuted,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                    );
+                  },
                 ),
-              );
-            },
-          ),
           const SizedBox(height: 30),
         ],
+      ),
+    );
+  }
+
+  Widget _buildStaffKpiCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.cardDark,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  value,
+                  style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStaffFilterPill(String label, int filterIndex) {
+    final isSelected = _selectedStaffFilter == filterIndex;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedStaffFilter = filterIndex;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryGold : AppColors.cardDark,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryGold : AppColors.divider,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isSelected ? Colors.black : Colors.white70,
+            fontSize: 11.5,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          ),
+        ),
       ),
     );
   }

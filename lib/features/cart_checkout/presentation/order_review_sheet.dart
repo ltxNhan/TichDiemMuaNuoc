@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/custom_toast.dart';
+import '../../../core/widgets/login_required_dialog.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../admin_dashboard/domain/review_provider.dart';
 
@@ -91,6 +92,29 @@ class _OrderReviewSheetState extends State<OrderReviewSheet> {
   final TextEditingController _commentController = TextEditingController();
   bool _hasAttachedPhoto = false;
   bool _isSubmitting = false;
+  bool _isAlreadyReviewed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final reviewProvider = Provider.of<ReviewProvider>(context, listen: false);
+      if (reviewProvider.hasReviewed(widget.orderCode)) {
+        setState(() => _isAlreadyReviewed = true);
+        final existing = reviewProvider.getReviewForOrder(widget.orderCode);
+        if (existing != null) {
+          final qIndex = _qualityOptions.indexWhere((q) => q['stars'] == existing.qualityStars);
+          if (qIndex >= 0) _selectedQualityIndex = qIndex;
+          _commentController.text = existing.comment;
+          _hasAttachedPhoto = existing.hasPhoto;
+          for (var tag in _quickTags) {
+            tag['selected'] = existing.quickTags.contains(tag['label']);
+          }
+          setState(() {});
+        }
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -99,13 +123,22 @@ class _OrderReviewSheetState extends State<OrderReviewSheet> {
   }
 
   void _submitReview() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (auth.isGuest) {
+      LoginRequiredDialog.show(
+        context,
+        title: 'YÊU CẦU ĐĂNG NHẬP',
+        message: 'Bạn đang ở chế độ Khách vãng lai. Vui lòng đăng nhập tài khoản để gửi đánh giá chất lượng và nhận điểm thưởng thành viên!',
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
-    await Future.delayed(const Duration(milliseconds: 700));
+    await Future.delayed(const Duration(milliseconds: 600));
 
     if (!mounted) return;
 
     final selected = _qualityOptions[_selectedQualityIndex];
-    final auth = Provider.of<AuthProvider>(context, listen: false);
     final reviewProvider = Provider.of<ReviewProvider>(context, listen: false);
 
     // Thu thập các quick tags đã chọn
@@ -114,8 +147,8 @@ class _OrderReviewSheetState extends State<OrderReviewSheet> {
         .map((t) => t['label'] as String)
         .toList();
 
-    // Cập nhật ngay vào Admin Dashboard
-    reviewProvider.addReview(
+    // Cập nhật vào Admin Dashboard & kiểm tra xem có phải lần đầu không
+    final isFirstTime = reviewProvider.addReview(
       orderCode: widget.orderCode,
       userName: auth.currentUser?.fullName ?? 'Nguyễn Văn An',
       userAvatar: auth.currentUser?.avatarUrl ??
@@ -128,16 +161,21 @@ class _OrderReviewSheetState extends State<OrderReviewSheet> {
       hasPhoto: _hasAttachedPhoto,
     );
 
-    // Thưởng điểm cho khách hàng đã đánh giá
-    auth.addPoints(10);
+    // CHỈ THƯỞNG ĐIỂM NẾU LÀ LẦN ĐÁNH GIÁ ĐẦU TIÊN CỦA ĐƠN HÀNG NÀY (CHỐNG SPAM)
+    if (isFirstTime) {
+      auth.addPoints(5);
+      CustomToast.showSuccess(
+        context,
+        'Cảm ơn bạn đã đánh giá "${selected['label']}"! Bạn nhận được +5 điểm thưởng 🎉',
+      );
+    } else {
+      CustomToast.showSuccess(
+        context,
+        'Đã cập nhật đánh giá của bạn cho đơn #${widget.orderCode} thành công!',
+      );
+    }
 
     Navigator.of(context).pop();
-
-    // Hiển thị thông báo cảm ơn
-    CustomToast.showSuccess(
-      context,
-      'Cảm ơn bạn đã đánh giá "${selected['label']}"! Bình luận đã được gửi tới Quản trị viên & bạn nhận +10 điểm 🎉',
-    );
   }
 
   @override
@@ -448,23 +486,35 @@ class _OrderReviewSheetState extends State<OrderReviewSheet> {
 
                   const SizedBox(height: 20),
 
-                  // Huy hiệu tích điểm thưởng
+                  // Huy hiệu tích điểm thưởng hoặc thông báo đã đánh giá
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryGold.withOpacity(0.12),
+                      color: _isAlreadyReviewed
+                          ? Colors.white.withOpacity(0.06)
+                          : AppColors.primaryGold.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primaryGold.withOpacity(0.4)),
+                      border: Border.all(
+                        color: _isAlreadyReviewed
+                            ? Colors.white24
+                            : AppColors.primaryGold.withOpacity(0.4),
+                      ),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.stars_rounded, color: AppColors.primaryGold, size: 20),
-                        SizedBox(width: 8),
+                        Icon(
+                          _isAlreadyReviewed ? Icons.info_outline_rounded : Icons.stars_rounded,
+                          color: _isAlreadyReviewed ? Colors.white70 : AppColors.primaryGold,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Bạn sẽ nhận ngay +10 điểm thành viên sau khi gửi đánh giá.',
+                            _isAlreadyReviewed
+                                ? 'Đơn hàng này đã được đánh giá và nhận 5 điểm trước đó. Mọi cập nhật sẽ không cộng thêm điểm.'
+                                : 'Bạn sẽ nhận ngay +5 điểm thành viên sau khi gửi đánh giá lần đầu.',
                             style: TextStyle(
-                              color: AppColors.primaryGold,
+                              color: _isAlreadyReviewed ? Colors.white70 : AppColors.primaryGold,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
                             ),
@@ -487,9 +537,11 @@ class _OrderReviewSheetState extends State<OrderReviewSheet> {
             ),
             child: SafeArea(
               child: CustomButton(
-                text: 'GỬI ĐÁNH GIÁ & NHẬN 10 ĐIỂM',
+                text: _isAlreadyReviewed
+                    ? 'CẬP NHẬT ĐÁNH GIÁ'
+                    : 'GỬI ĐÁNH GIÁ & NHẬN 5 ĐIỂM',
                 isLoading: _isSubmitting,
-                icon: Icons.send_rounded,
+                icon: _isAlreadyReviewed ? Icons.edit_note_rounded : Icons.send_rounded,
                 onPressed: _submitReview,
               ),
             ),

@@ -17,8 +17,8 @@ class CartProvider extends ChangeNotifier {
   String _orderType = 'pickup'; // 'pickup' | 'delivery'
   DateTime _pickupTime = DateTime.now().add(const Duration(minutes: 15));
   String _deliveryAddress = 'Tòa nhà Landmark 81, 720A Điện Biên Phủ, P.22, Bình Thạnh, TP.HCM';
-  String _recipientName = 'Nguyễn Văn An';
-  String _recipientPhone = '0901234567';
+  String _recipientName = '';
+  String _recipientPhone = '';
   String _paymentMethod = 'vietqr'; // 'cash', 'vietqr', 'wallet'
   String _orderNote = '';
 
@@ -240,12 +240,20 @@ class CartProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
+      final user = authProvider.currentUser;
+      final effectiveCustomerName = _recipientName.trim().isNotEmpty
+          ? _recipientName.trim()
+          : ((user?.fullName.isNotEmpty == true) ? user!.fullName : 'Khách đặt qua App');
+      final effectiveCustomerPhone = _recipientPhone.trim().isNotEmpty
+          ? _recipientPhone.trim()
+          : ((user?.phone.isNotEmpty == true) ? user!.phone : '0901234567');
+
       final payload = {
         'order_type': _orderType,
         'pickup_time': _orderType == 'pickup' ? _pickupTime.toIso8601String() : null,
         'delivery_address': _orderType == 'delivery' ? _deliveryAddress : null,
-        'recipient_phone': _recipientPhone,
-        'recipient_name': _recipientName,
+        'recipient_phone': effectiveCustomerPhone,
+        'recipient_name': effectiveCustomerName,
         'items': _items.map((i) => i.toApiJson()).toList(),
         'points_used': _usePoints ? _pointsToUse : 0,
         'voucher_code': _appliedVoucherCode,
@@ -282,8 +290,8 @@ class CartProvider extends ChangeNotifier {
         sl<StaffProvider>().addOrderFromCustomer(
           orderCode: result.order.orderCode,
           orderType: _orderType,
-          customerName: _recipientName.isNotEmpty ? _recipientName : (authProvider.currentUser?.fullName ?? 'Khách đặt qua App'),
-          customerPhone: _recipientPhone.isNotEmpty ? _recipientPhone : (authProvider.currentUser?.phone ?? '0901234567'),
+          customerName: effectiveCustomerName,
+          customerPhone: effectiveCustomerPhone,
           deliveryAddress: _orderType == 'delivery' ? _deliveryAddress : null,
           pickupTime: _orderType == 'pickup' ? '${_pickupTime.hour.toString().padLeft(2, '0')}:${_pickupTime.minute.toString().padLeft(2, '0')}' : null,
           items: staffItems,

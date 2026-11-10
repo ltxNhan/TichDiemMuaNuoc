@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/custom_toast.dart';
+import '../../auth/presentation/login_screen.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../domain/review_model.dart';
 import '../domain/review_provider.dart';
@@ -153,6 +154,10 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
                 await auth.logout();
                 if (context.mounted) {
                   CustomToast.showSuccess(context, 'Đã đăng xuất tài khoản quản trị viên');
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    (route) => false,
+                  );
                 }
               }
             },

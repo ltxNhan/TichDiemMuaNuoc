@@ -24,6 +24,7 @@ class UserModel {
   bool get isCustomer => role == 'customer';
   bool get isStaff => role == 'staff';
   bool get isAdmin => role == 'admin';
+  bool get isGuest => id == 'guest' || phone.isEmpty;
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(

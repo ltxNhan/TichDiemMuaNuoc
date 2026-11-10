@@ -42,8 +42,10 @@ class _OrderTrackingSheetState extends State<OrderTrackingSheet> {
           orElse: () => null,
         );
 
+    // Use widget.order status as fallback when currentStaffOrder is not found
+    // (e.g., during initial load when orders haven't been synced yet)
     final isPickup = (currentStaffOrder?.orderType ?? widget.order.orderType) == 'pickup';
-    final status = currentStaffOrder?.orderStatus ?? 'pending';
+    final status = currentStaffOrder?.orderStatus ?? widget.order.orderStatus;
 
     int currentStep = 0;
     String bannerTitle;

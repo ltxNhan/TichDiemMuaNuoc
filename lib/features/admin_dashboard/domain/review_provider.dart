@@ -64,7 +64,27 @@ class ReviewProvider extends ChangeNotifier {
     ),
   ];
 
+  // Tập hợp các mã đơn hàng đã được đánh giá (chống spam đánh giá trùng lặp để cày điểm)
+  late final Set<String> _reviewedOrderCodes = {
+    'BP-20261024-001',
+    'BP-20261023-089',
+    'BP-20261023-042',
+    'BP-20261022-015',
+  };
+
   List<ReviewModel> get reviews => List.unmodifiable(_reviews);
+
+  /// Kiểm tra xem đơn hàng đã từng được đánh giá chưa
+  bool hasReviewed(String orderCode) => _reviewedOrderCodes.contains(orderCode.trim());
+
+  /// Lấy đánh giá đã viết cho một mã đơn hàng (nếu có)
+  ReviewModel? getReviewForOrder(String orderCode) {
+    try {
+      return _reviews.firstWhere((r) => r.orderCode == orderCode.trim());
+    } catch (_) {
+      return null;
+    }
+  }
 
   // Thống kê tổng quan cho Admin
   int get totalReviews => _reviews.length;
@@ -87,7 +107,10 @@ class ReviewProvider extends ChangeNotifier {
     return (satisfied / _reviews.length) * 100;
   }
 
-  void addReview({
+  /// Thêm hoặc cập nhật đánh giá cho đơn hàng.
+  /// Trả về `true` nếu là lần đánh giá ĐẦU TIÊN (đủ điều kiện cộng +10 điểm).
+  /// Trả về `false` nếu là chỉnh sửa đánh giá cũ (KHÔNG cộng thêm điểm).
+  bool addReview({
     required String orderCode,
     required String userName,
     required String userAvatar,
@@ -98,25 +121,47 @@ class ReviewProvider extends ChangeNotifier {
     required String comment,
     required bool hasPhoto,
   }) {
-    final newReview = ReviewModel(
-      id: 'rev_${DateTime.now().millisecondsSinceEpoch}',
-      orderCode: orderCode,
-      userName: userName,
-      userAvatar: userAvatar,
-      qualityStars: qualityStars,
-      qualityLabel: qualityLabel,
-      qualityEmoji: qualityEmoji,
-      quickTags: quickTags,
-      comment: comment.isEmpty
-          ? 'Khách hàng đánh giá món ăn $qualityLabel ($qualityEmoji)'
-          : comment,
-      hasPhoto: hasPhoto,
-      createdAt: DateTime.now(),
-    );
+    final cleanCode = orderCode.trim();
+    final existingIndex = _reviews.indexWhere((r) => r.orderCode == cleanCode);
+    final bool isFirstTime = existingIndex < 0;
 
-    // Đưa lên đầu danh sách
-    _reviews.insert(0, newReview);
+    if (isFirstTime) {
+      final newReview = ReviewModel(
+        id: 'rev_${DateTime.now().millisecondsSinceEpoch}',
+        orderCode: cleanCode,
+        userName: userName,
+        userAvatar: userAvatar,
+        qualityStars: qualityStars,
+        qualityLabel: qualityLabel,
+        qualityEmoji: qualityEmoji,
+        quickTags: quickTags,
+        comment: comment.isEmpty
+            ? 'Khách hàng đánh giá món ăn $qualityLabel ($qualityEmoji)'
+            : comment,
+        hasPhoto: hasPhoto,
+        createdAt: DateTime.now(),
+      );
+
+      // Đưa lên đầu danh sách
+      _reviews.insert(0, newReview);
+      _reviewedOrderCodes.add(cleanCode);
+    } else {
+      // Cập nhật đánh giá đã tồn tại mà không tạo bản ghi mới
+      final old = _reviews[existingIndex];
+      _reviews[existingIndex] = old.copyWith(
+        userName: userName,
+        userAvatar: userAvatar,
+        qualityStars: qualityStars,
+        qualityLabel: qualityLabel,
+        qualityEmoji: qualityEmoji,
+        quickTags: quickTags,
+        comment: comment.isEmpty ? old.comment : comment,
+        hasPhoto: hasPhoto,
+      );
+    }
+
     notifyListeners();
+    return isFirstTime;
   }
 
   void replyReview(String reviewId, String replyText) {

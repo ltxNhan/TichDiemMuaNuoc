@@ -5,6 +5,8 @@ import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/custom_toast.dart';
+import '../../../../core/widgets/login_required_dialog.dart';
+import '../../../auth/providers/auth_provider.dart';
 import '../../../cart_checkout/models/cart_item_model.dart';
 import '../../../cart_checkout/providers/cart_provider.dart';
 import '../../models/product_model.dart';
@@ -73,6 +75,16 @@ class _CustomizationBottomSheetState extends State<CustomizationBottomSheet> {
   double get _totalPrice => _currentUnitPrice * _quantity;
 
   void _onAddToCart() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.isGuest) {
+      LoginRequiredDialog.show(
+        context,
+        title: 'HÃY ĐĂNG NHẬP ĐỂ MUA HÀNG',
+        message: 'Bạn đang ở chế độ Khách vãng lai. Vui lòng đăng nhập tài khoản để đặt món, nhận ưu đãi và tích điểm thưởng!',
+      );
+      return;
+    }
+
     final cartProvider = Provider.of<CartProvider>(context, listen: false);
 
     final item = CartItemModel(
@@ -95,6 +107,8 @@ class _CustomizationBottomSheetState extends State<CustomizationBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
+
     return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.9,
@@ -409,9 +423,11 @@ class _CustomizationBottomSheetState extends State<CustomizationBottomSheet> {
                   // Add To Cart Button with dynamic total
                   Expanded(
                     child: CustomButton(
-                      text: widget.product.isAvailable
-                          ? 'THÊM • ${CurrencyFormatter.format(_totalPrice)}'
-                          : 'ĐÃ BÁN HẾT HẸN BẠN VÀO HÔM SAU',
+                      text: !widget.product.isAvailable
+                          ? 'ĐÃ BÁN HẾT HẸN BẠN VÀO HÔM SAU'
+                          : (auth.isGuest
+                              ? 'ĐĂNG NHẬP ĐỂ MUA • ${CurrencyFormatter.format(_totalPrice)}'
+                              : 'THÊM • ${CurrencyFormatter.format(_totalPrice)}'),
                       onPressed: widget.product.isAvailable ? _onAddToCart : null,
                     ),
                   ),

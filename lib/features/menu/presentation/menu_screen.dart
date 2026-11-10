@@ -107,6 +107,9 @@ class _MenuScreenState extends State<MenuScreen> {
               itemBuilder: (context, index) {
                 final cat = menu.categories[index];
                 final isSelected = menu.selectedCategoryId == cat.id;
+                final productCount = cat.id == 1
+                    ? menu.allProducts.length
+                    : menu.allProducts.where((p) => p.categoryId == cat.id).length;
 
                 return GestureDetector(
                   onTap: () => menu.selectCategory(cat.id),
@@ -136,6 +139,26 @@ class _MenuScreenState extends State<MenuScreen> {
                             color: isSelected ? Colors.white : AppColors.textSecondary,
                           ),
                         ),
+                        if (productCount > 0) ...[
+                          const SizedBox(width: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? Colors.white.withOpacity(0.2)
+                                  : Colors.white.withOpacity(0.06),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$productCount',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected ? Colors.white : AppColors.textMuted,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

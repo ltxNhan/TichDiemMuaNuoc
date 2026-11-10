@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
 
@@ -10,17 +10,8 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
 
   AuthProvider(this._repository) {
-    // Initialize default demo profile as Customer
-    _currentUser = const UserModel(
-      id: 'usr_gold_001',
-      phone: '0901234567',
-      fullName: 'Nguyễn Văn An',
-      role: 'customer',
-      points: 350,
-      membershipTier: 'Gold',
-      totalSpent: 4200000.0,
-      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=400&q=80',
-    );
+    // Không tự động đăng nhập - Khi khởi động ứng dụng sẽ yêu cầu vào màn hình Đăng ký / Đăng nhập trước
+    _currentUser = null;
   }
 
   void switchDemoRole(String role) {
@@ -75,7 +66,8 @@ class AuthProvider extends ChangeNotifier {
   }
 
   UserModel? get currentUser => _currentUser;
-  bool get isAuthenticated => _currentUser != null;
+  bool get isAuthenticated => _currentUser != null && !_currentUser!.isGuest;
+  bool get isGuest => _currentUser == null || _currentUser!.isGuest;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 

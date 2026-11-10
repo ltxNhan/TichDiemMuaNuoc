@@ -11,6 +11,7 @@ import '../features/menu/providers/menu_provider.dart';
 import '../features/menu/repositories/menu_repository.dart';
 import '../features/admin_dashboard/domain/review_provider.dart';
 import '../features/staff/providers/staff_provider.dart';
+import '../features/cart_checkout/repositories/supabase_order_service.dart';
 
 final sl = GetIt.instance;
 
@@ -29,6 +30,7 @@ Future<void> initDependencies() async {
   sl.registerLazySingleton<AuthRepository>(() => AuthRepository(sl<DioClient>()));
   sl.registerLazySingleton<MenuRepository>(() => MenuRepository(sl<DioClient>()));
   sl.registerLazySingleton<OrderRepository>(() => OrderRepository(sl<DioClient>()));
+  sl.registerLazySingleton<SupabaseOrderService>(() => SupabaseOrderService());
   sl.registerLazySingleton<LoyaltyRepository>(() => LoyaltyRepository(sl<DioClient>()));
 
   // Providers

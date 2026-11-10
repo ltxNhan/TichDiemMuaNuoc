@@ -21,6 +21,21 @@ class StaffOrderItem {
     this.isCompleted = false,
   });
 
+  /// Factory constructor to create StaffOrderItem from a map
+  factory StaffOrderItem.fromJson(Map<String, dynamic> json) {
+    return StaffOrderItem(
+      productName: json['productName']?.toString() ?? '',
+      sizeName: json['sizeName']?.toString() ?? 'M',
+      sugarLevel: json['sugarLevel']?.toString() ?? '50%',
+      iceLevel: json['iceLevel']?.toString() ?? '50%',
+      toppings: (json['toppings'] as List?)?.cast<String>() ?? const [],
+      quantity: (json['quantity'] is num) ? (json['quantity'] as num).toInt() : 1,
+      unitPrice: (json['unitPrice'] is num) ? (json['unitPrice'] as num).toDouble() : 0.0,
+      note: json['note']?.toString(),
+      isCompleted: json['isCompleted'] ?? false,
+    );
+  }
+
   String get recipeSummary {
     final parts = <String>[];
     parts.add('Size $sizeName');
@@ -31,6 +46,8 @@ class StaffOrderItem {
     }
     return parts.join(' • ');
   }
+
+  String get customizationSummary => recipeSummary;
 }
 
 class StaffOrder {

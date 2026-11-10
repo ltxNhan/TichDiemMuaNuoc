@@ -5,6 +5,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/widgets/custom_button.dart';
 import '../../../core/widgets/custom_toast.dart';
+import '../../../main_navigation_screen.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -75,7 +76,13 @@ class _LoginScreenState extends State<LoginScreen>
         context,
         'Chào mừng ${authProvider.currentUser?.fullName}!',
       );
-      Navigator.of(context).pop();
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        );
+      }
     } else {
       CustomToast.showError(
         context,
@@ -123,33 +130,17 @@ class _LoginScreenState extends State<LoginScreen>
         context,
         'Đăng ký thành công! Bạn nhận được 50 điểm thưởng chào mừng 🎉',
       );
-      Navigator.of(context).pop();
-    } else {
-      CustomToast.showError(
-        context,
-        authProvider.errorMessage ?? 'Đăng ký không thành công',
-      );
-    }
-  }
-
-  void _onGoogleLogin() async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final success = await authProvider.loginWithGoogle();
-
-    if (!mounted) return;
-
-    if (success) {
-      CustomToast.showSuccess(
-        context,
-        'Đăng nhập thành công! Bạn nhận được 50 điểm thưởng chào mừng 🎉',
-      );
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+        );
       }
     } else {
       CustomToast.showError(
         context,
-        authProvider.errorMessage ?? 'Đăng nhập Google thất bại',
+        authProvider.errorMessage ?? 'Đăng ký không thành công',
       );
     }
   }
@@ -480,35 +471,6 @@ class _LoginScreenState extends State<LoginScreen>
     );
   }
 
-  Widget _buildGoogleLogo() {
-    return Container(
-      width: 22,
-      height: 22,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-      ),
-      child: Center(
-        child: Text(
-          'G',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w900,
-            foreground: Paint()
-              ..shader = const LinearGradient(
-                colors: [
-                  Color(0xFF4285F4),
-                  Color(0xFF34A853),
-                  Color(0xFFFBBC05),
-                  Color(0xFFEA4335),
-                ],
-              ).createShader(const Rect.fromLTWH(0.0, 0.0, 20.0, 20.0)),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -543,6 +505,10 @@ class _LoginScreenState extends State<LoginScreen>
               authProvider.continueAsGuest();
               if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
+              } else {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+                );
               }
             },
             child: const Text(
@@ -617,17 +583,29 @@ class _LoginScreenState extends State<LoginScreen>
 
               // TabBar Đăng nhập / Đăng ký
               Container(
-                height: 46,
+                height: 50,
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceDark,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppColors.divider),
                 ),
                 child: TabBar(
                   controller: _tabController,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  splashFactory: NoSplash.splashFactory,
+                  overlayColor: MaterialStateProperty.all(Colors.transparent),
                   indicator: BoxDecoration(
                     color: AppColors.primaryGold,
                     borderRadius: BorderRadius.circular(10),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primaryGold.withOpacity(0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                   labelColor: Colors.black,
                   unselectedLabelColor: AppColors.textMuted,
@@ -635,9 +613,31 @@ class _LoginScreenState extends State<LoginScreen>
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                   tabs: const [
-                    Tab(text: 'Đăng nhập'),
-                    Tab(text: 'Đăng ký'),
+                    Tab(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.login_rounded, size: 16),
+                          SizedBox(width: 8),
+                          Text('Đăng nhập'),
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.person_add_rounded, size: 16),
+                          SizedBox(width: 8),
+                          Text('Đăng ký'),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -782,58 +782,7 @@ class _LoginScreenState extends State<LoginScreen>
           isLoading: authProvider.isLoading,
           onPressed: _onLogin,
         ),
-        const SizedBox(height: 20),
-
-        // Divider
-        const Row(
-          children: [
-            Expanded(child: Divider(color: AppColors.divider)),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                'HOẶC TIẾP TỤC VỚI',
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ),
-            Expanded(child: Divider(color: AppColors.divider)),
-          ],
-        ),
-        const SizedBox(height: 14),
-
-        // Nút Đăng nhập nhanh với Google
-        InkWell(
-          onTap: authProvider.isLoading ? null : _onGoogleLogin,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceDark,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.divider),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildGoogleLogo(),
-                const SizedBox(width: 10),
-                const Text(
-                  'Đăng nhập với Google',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 18),
 
         Center(
           child: TextButton.icon(
@@ -841,6 +790,10 @@ class _LoginScreenState extends State<LoginScreen>
               authProvider.continueAsGuest();
               if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
+              } else {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+                );
               }
             },
             icon: const Icon(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../models/category_model.dart';
 import '../models/product_model.dart';
 import '../models/topping_model.dart';
@@ -116,7 +117,9 @@ class MenuProvider extends ChangeNotifier {
 
       final bIdx = _bestsellers.indexWhere((p) => p.id == productId);
       if (bIdx != -1) {
-        _bestsellers[bIdx] = _bestsellers[bIdx].copyWith(isAvailable: newStatus);
+        _bestsellers[bIdx] = _bestsellers[bIdx].copyWith(
+          isAvailable: newStatus,
+        );
       }
 
       notifyListeners();
@@ -177,12 +180,14 @@ class MenuProvider extends ChangeNotifier {
 
     final pIdx = _products.indexWhere((p) => p.id == product.id);
     if (pIdx != -1) {
-      if (product.categoryId == _selectedCategoryId || _selectedCategoryId == 1) {
+      if (product.categoryId == _selectedCategoryId ||
+          _selectedCategoryId == 1) {
         _products[pIdx] = product;
       } else {
         _products.removeAt(pIdx);
       }
-    } else if (product.categoryId == _selectedCategoryId || _selectedCategoryId == 1) {
+    } else if (product.categoryId == _selectedCategoryId ||
+        _selectedCategoryId == 1) {
       _products.insert(0, product);
     }
 
@@ -233,7 +238,9 @@ class MenuProvider extends ChangeNotifier {
     _repository.addCategory(category);
 
     final existingIdx = _categories.indexWhere(
-      (c) => c.id == category.id || c.name.trim().toLowerCase() == category.name.trim().toLowerCase(),
+      (c) =>
+          c.id == category.id ||
+          c.name.trim().toLowerCase() == category.name.trim().toLowerCase(),
     );
 
     if (existingIdx != -1) {

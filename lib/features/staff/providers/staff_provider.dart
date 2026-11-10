@@ -1,13 +1,18 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/staff_order_model.dart';
+import '../../cart_checkout/repositories/supabase_order_service.dart';
+import '../../../core/injection_container.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class StaffProvider extends ChangeNotifier {
-  // Ca làm việc của nhân viên
   final String staffName = 'Lê Minh Trí';
   final String staffId = 'BP-STF-08';
   final String staffRole = 'Barista Trưởng & Quản lý ca';
 
-  final List<StaffOrder> _orders = [
+  final SupabaseOrderService _supabaseService;
+
+  List<StaffOrder> _orders = [
     StaffOrder(
       id: 'ord_101',
       orderCode: 'BP-20261030-011',
@@ -18,7 +23,7 @@ class StaffProvider extends ChangeNotifier {
       totalAmount: 116000,
       paymentMethod: 'vietqr',
       paymentStatus: 'paid',
-      orderStatus: 'pending', // Đơn mới đang chờ pha
+      orderStatus: 'pending',
       note: 'Giao nước lúc còn mát lạnh, cho thêm ống hút to giúp mình nhé',
       createdAt: DateTime.now().subtract(const Duration(minutes: 3)),
       items: [
@@ -54,7 +59,7 @@ class StaffProvider extends ChangeNotifier {
       totalAmount: 58000,
       paymentMethod: 'vietqr',
       paymentStatus: 'paid',
-      orderStatus: 'processing', // Đang pha chế dở
+      orderStatus: 'processing',
       note: 'Khách tự đến quầy lấy',
       createdAt: DateTime.now().subtract(const Duration(minutes: 8)),
       items: [
@@ -66,7 +71,7 @@ class StaffProvider extends ChangeNotifier {
           toppings: ['Kem Cheese Macchiato béo mặn'],
           quantity: 1,
           unitPrice: 58000,
-          isCompleted: true, // Ly này đã xong
+          isCompleted: true,
         ),
       ],
     ),
@@ -80,7 +85,7 @@ class StaffProvider extends ChangeNotifier {
       totalAmount: 90000,
       paymentMethod: 'cash',
       paymentStatus: 'unpaid',
-      orderStatus: 'ready_for_pickup', // Đã pha xong, chờ tài xế lấy
+      orderStatus: 'ready_for_pickup',
       note: 'Thu tiền mặt tận nơi',
       createdAt: DateTime.now().subtract(const Duration(minutes: 18)),
       items: [
@@ -96,36 +101,9 @@ class StaffProvider extends ChangeNotifier {
         ),
       ],
     ),
-    StaffOrder(
-      id: 'ord_104',
-      orderCode: 'BP-20261030-008',
-      orderType: 'delivery',
-      customerName: 'Phạm Minh Đức',
-      customerPhone: '0933445566',
-      deliveryAddress: '15 Lê Duẩn, Bến Nghé, Quận 1',
-      totalAmount: 118000,
-      paymentMethod: 'vietqr',
-      paymentStatus: 'paid',
-      orderStatus: 'delivering', // Đang giao
-      createdAt: DateTime.now().subtract(const Duration(minutes: 25)),
-      items: [
-        StaffOrderItem(
-          productName: 'Berry Chocolate Blast',
-          sizeName: 'M',
-          sugarLevel: '50%',
-          iceLevel: '50%',
-          toppings: ['Pudding trứng phô mai'],
-          quantity: 2,
-          unitPrice: 59000,
-          isCompleted: true,
-        ),
-      ],
-    ),
   ];
-
   List<StaffOrder> get orders => List.unmodifiable(_orders);
 
-  // Bộ lọc theo phân loại của Barista
   List<StaffOrder> get pendingOrders =>
       _orders.where((o) => o.orderStatus == 'pending').toList();
 
@@ -141,10 +119,11 @@ class StaffProvider extends ChangeNotifier {
   List<StaffOrder> get completedOrders =>
       _orders.where((o) => o.orderStatus == 'completed').toList();
 
-  // Thống kê ca làm việc
   int get totalCupsMadeInShift {
     return _orders
-        .where((o) => o.orderStatus == 'ready_for_pickup' || o.orderStatus == 'delivering' || o.orderStatus == 'completed')
+        .where((o) => o.orderStatus == 'ready_for_pickup' ||
+            o.orderStatus == 'delivering' ||
+            o.orderStatus == 'completed')
         .fold(0, (sum, o) => sum + o.totalCupCount);
   }
 
@@ -154,9 +133,41 @@ class StaffProvider extends ChangeNotifier {
         .fold(0.0, (sum, o) => sum + o.totalAmount);
   }
 
-  // --- Chức năng Logic của Barista & Điều phối ---
+  StreamSubscription<dynamic>? _ordersSubscription;
+  bool _realtimeInitialized = false;
+  bool _isLoading = true;
 
-  // 1. Nhận đơn và bắt đầu pha chế
+  StaffProvider({SupabaseOrderService? supabaseService})
+      : _supabaseService = supabaseService ?? SupabaseOrderService() {
+    _initRealtime();
+  }
+
+  bool get isLoading => _isLoading;
+
+  void _initRealtime() {
+    if (_realtimeInitialized) return;
+    _realtimeInitialized = true;
+
+    _ordersSubscription = _supabaseService.listenNewOrders().listen((newOrders) {
+      if (newOrders.isNotEmpty) {
+        _orders = newOrders;
+        notifyListeners();
+      }
+    });
+
+    _supabaseService.getOrders().then((orders) {
+      if (orders.isNotEmpty) {
+        _orders = List.of(orders);
+      }
+      _isLoading = false;
+      notifyListeners();
+    }).catchError((e) {
+      _isLoading = false;
+      notifyListeners();
+    });
+  }
+
+
   void startPreparing(String orderId) {
     final index = _orders.indexWhere((o) => o.id == orderId);
     if (index >= 0) {
@@ -165,22 +176,20 @@ class StaffProvider extends ChangeNotifier {
     }
   }
 
-  // 2. Barista tick hoàn thành từng ly nước trong đơn
   void toggleItemCompletion(String orderId, int itemIndex) {
     final orderIdx = _orders.indexWhere((o) => o.id == orderId);
     if (orderIdx >= 0 && itemIndex < _orders[orderIdx].items.length) {
       final item = _orders[orderIdx].items[itemIndex];
       item.isCompleted = !item.isCompleted;
 
-      // Nếu tất cả ly đã xong, tự động chuyển đơn sang sẵn sàng
-      if (_orders[orderIdx].areAllItemsCompleted && _orders[orderIdx].orderStatus == 'processing') {
+      if (_orders[orderIdx].areAllItemsCompleted &&
+          _orders[orderIdx].orderStatus == 'processing') {
         _orders[orderIdx].orderStatus = 'ready_for_pickup';
       }
       notifyListeners();
     }
   }
 
-  // 3. Đánh dấu đã pha chế xong tất cả ly trong đơn
   void markOrderReady(String orderId) {
     final index = _orders.indexWhere((o) => o.id == orderId);
     if (index >= 0) {
@@ -192,7 +201,6 @@ class StaffProvider extends ChangeNotifier {
     }
   }
 
-  // 4. Bắt đầu giao hàng (Cho Shipper / Điều phối)
   void startDelivery(String orderId) {
     final index = _orders.indexWhere((o) => o.id == orderId);
     if (index >= 0) {
@@ -201,7 +209,6 @@ class StaffProvider extends ChangeNotifier {
     }
   }
 
-  // 5. Xác nhận giao hàng thành công
   void completeDelivery(String orderId) {
     final index = _orders.indexWhere((o) => o.id == orderId);
     if (index >= 0) {
@@ -214,10 +221,10 @@ class StaffProvider extends ChangeNotifier {
         customerPhone: _orders[index].customerPhone,
         deliveryAddress: _orders[index].deliveryAddress,
         pickupTime: _orders[index].pickupTime,
-        items: _orders[index].items,
+        items: List.of(_orders[index].items),
         totalAmount: _orders[index].totalAmount,
         paymentMethod: _orders[index].paymentMethod,
-        paymentStatus: 'paid', // Tự động thanh toán khi giao thành công
+        paymentStatus: 'paid',
         orderStatus: 'completed',
         note: _orders[index].note,
         createdAt: _orders[index].createdAt,
@@ -226,7 +233,6 @@ class StaffProvider extends ChangeNotifier {
     }
   }
 
-  // 6. Xác nhận khách đã lấy nước tại quầy (Cho đơn Pickup)
   void completePickupOrder(String orderId) {
     final index = _orders.indexWhere((o) => o.id == orderId);
     if (index >= 0) {
@@ -239,7 +245,7 @@ class StaffProvider extends ChangeNotifier {
         customerPhone: _orders[index].customerPhone,
         deliveryAddress: _orders[index].deliveryAddress,
         pickupTime: _orders[index].pickupTime,
-        items: _orders[index].items,
+        items: List.of(_orders[index].items),
         totalAmount: _orders[index].totalAmount,
         paymentMethod: _orders[index].paymentMethod,
         paymentStatus: 'paid',
@@ -251,7 +257,6 @@ class StaffProvider extends ChangeNotifier {
     }
   }
 
-  // 7. Nhận đơn mới từ ứng dụng Khách hàng đặt món
   void addOrderFromCustomer({
     required String orderCode,
     required String orderType,
@@ -276,7 +281,7 @@ class StaffProvider extends ChangeNotifier {
       totalAmount: totalAmount,
       paymentMethod: paymentMethod,
       paymentStatus: paymentMethod == 'vietqr' ? 'paid' : 'unpaid',
-      orderStatus: 'pending', // Chờ pha chế
+      orderStatus: 'pending',
       note: note,
       createdAt: DateTime.now(),
     );
@@ -285,29 +290,64 @@ class StaffProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // --- Logic Thu ngân Quét mã Dynamic QR tại quầy (POS Scanner) ---
+  /// Khách hàng hủy đơn hàng (chỉ khả dụng trong 3 phút đầu khi đơn còn ở trạng thái 'pending')
+  bool cancelOrder(String orderCode) {
+    final index = _orders.indexWhere((o) => o.orderCode == orderCode);
+    if (index >= 0) {
+      final order = _orders[index];
+      final elapsedMinutes = DateTime.now().difference(order.createdAt).inMinutes;
+
+      if (order.orderStatus == 'pending' && elapsedMinutes <= 3) {
+        _orders[index].orderStatus = 'cancelled';
+        notifyListeners();
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<Map<String, dynamic>> verifyCustomerQrAndAddPoints({
     required String qrToken,
     required double billAmount,
   }) async {
     await Future.delayed(const Duration(milliseconds: 600));
 
-    // Tính điểm thưởng: 10.000đ = 1 điểm
     final pointsToAdd = (billAmount / 10000).floor();
 
-    // Giả lập thông tin khách hàng được quét mã
+    String custName = 'Nguyễn Văn An';
+    String custPhone = '0901234567';
+    String custTier = 'Gold';
+    int curPoints = 350;
+
+    try {
+      final auth = sl<AuthProvider>();
+      if (auth.currentUser != null && !auth.currentUser!.isGuest) {
+        custName = auth.currentUser!.fullName;
+        custPhone = auth.currentUser!.phone;
+        custTier = auth.currentUser!.membershipTier;
+        curPoints = auth.currentUser!.points;
+        auth.updatePointsAndTier(curPoints + pointsToAdd, custTier, billAmount);
+      }
+    } catch (_) {}
+
     final result = {
       'success': true,
-      'customer_name': 'Nguyễn Văn An',
-      'customer_phone': '0901234567',
-      'membership_tier': 'Gold',
+      'customer_name': custName,
+      'customer_phone': custPhone,
+      'membership_tier': custTier,
       'points_added': pointsToAdd,
-      'new_points_balance': 350 + pointsToAdd,
+      'new_points_balance': curPoints + pointsToAdd,
       'bill_amount': billAmount,
       'timestamp': DateTime.now().toIso8601String(),
     };
 
     notifyListeners();
     return result;
+  }
+
+  @override
+  void dispose() {
+    _ordersSubscription?.cancel();
+    super.dispose();
   }
 }
